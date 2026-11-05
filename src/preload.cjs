@@ -3,6 +3,8 @@ contextBridge.exposeInMainWorld('brisa', {
   installExtension: () => ipcRenderer.invoke('browser:install-extension'),
   extensions: () => ipcRenderer.invoke('browser:extensions'),
   removeExtension: id => ipcRenderer.invoke('browser:remove-extension', id),
+  findImportSources: () => ipcRenderer.invoke('browser:find-import-sources'),
+  importBookmarks: id => ipcRenderer.invoke('browser:import-bookmarks', id),
   setAdblock: enabled => ipcRenderer.invoke('browser:adblock-toggle', enabled),
   adblockCount: () => ipcRenderer.invoke('browser:adblock-count'),
   openExternal: url => ipcRenderer.invoke('browser:open-external', url),

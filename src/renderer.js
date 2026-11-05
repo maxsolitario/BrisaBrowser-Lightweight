@@ -248,7 +248,7 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
-async function openExtensions() {
+async function legacyOpenExtensions() {
   const extensions = await window.brisa.extensions();
   const rows = extensions.length
     ? extensions.map(item => `<div class="ext-row"><div>${escapeHtml(item.name)}<small>Versão ${escapeHtml(item.version)}</small></div><button data-remove="${escapeHtml(item.id)}">Remover</button></div>`).join('')
@@ -263,6 +263,41 @@ async function openExtensions() {
     button.onclick = async () => { await window.brisa.removeExtension(button.dataset.remove); openExtensions(); };
   });
 }
+
+const settingsSections = { appearance: 'Aparencia', privacy: 'Privacidade', extensions: 'Extensoes', import: 'Importar dados' };
+async function openSettings(section = 'appearance') {
+  const extensions = section === 'extensions' ? await window.brisa.extensions() : [];
+  const sources = section === 'import' ? await window.brisa.findImportSources() : [];
+  const nav = Object.entries(settingsSections).map(([id, name]) => `<button class="settings-nav ${id === section ? 'selected' : ''}" data-settings="${id}">${name}</button>`).join('');
+  let content = '';
+  if (section === 'appearance') content = `<h3>Pagina inicial</h3><p>Personalize os temas, o papel de parede e os atalhos da Home.</p><button class="panel-action" id="openAppearance">Abrir personalizacao</button>`;
+  if (section === 'privacy') content = `<h3>Protecao na navegacao</h3><div class="settings-row"><div><strong>Bloquear anuncios e rastreadores</strong><small>Usa listas de filtros atualizadas.</small></div><button id="adToggle" class="toggle ${state.adblock ? 'on' : ''}" aria-label="Alternar bloqueio"></button></div><div class="settings-row"><div><strong>Pedidos bloqueados nesta sessao</strong></div><b>${$('blockedCount').textContent}</b></div><p>Alguns anuncios incluidos diretamente no conteudo do site ainda podem aparecer.</p>`;
+  if (section === 'extensions') {
+    const rows = extensions.length ? extensions.map(item => `<article class="ext-row"><span class="ext-icon">◇</span><div class="ext-info"><strong>${escapeHtml(item.name)}</strong><small>Versao ${escapeHtml(item.version)}</small></div><button data-remove="${escapeHtml(item.id)}">Remover</button></article>`).join('') : '<div class="empty-state"><strong>Nenhuma extensao instalada</strong><p>Escolha a pasta descompactada de uma extensao compativel do Chromium.</p></div>';
+    content = `<h3>Extensoes instaladas <span class="count-badge">${extensions.length}</span></h3><p>Gerencie os complementos deste navegador.</p>${rows}<button class="panel-action primary-action" id="installExt">+ Instalar extensao do computador</button><div class="info-note"><strong>Como instalar</strong><p>Descompacte a extensao e selecione a pasta que contem manifest.json. Alguns recursos do Chrome podem nao funcionar no Brisa.</p></div>`;
+  }
+  if (section === 'import') {
+    const rows = sources.length ? sources.map(source => `<article class="import-row"><div><strong>${escapeHtml(source.name)}</strong><small>Favoritos</small></div><button data-import="${escapeHtml(source.id)}">Importar</button></article>`).join('') : '<div class="empty-state"><strong>Nenhum perfil encontrado</strong><p>Instale o Chrome, Edge ou Brave neste computador para importar favoritos.</p></div>';
+    content = `<h3>Importar de outro navegador</h3><p>Os favoritos serao organizados em grupos na Home.</p>${rows}<div class="info-note"><strong>Importacao disponivel</strong><p>Favoritos e pastas. Senhas, historico e cookies nao sao importados.</p></div>`;
+  }
+  openPanel('Configuracoes', `<div class="settings-layout"><nav class="settings-nav-list">${nav}</nav><div class="settings-content">${content}</div></div>`);
+  $('panelContent').querySelectorAll('[data-settings]').forEach(button => button.onclick = () => openSettings(button.dataset.settings));
+  if (section === 'appearance') $('openAppearance').onclick = openCustomize;
+  if (section === 'privacy') $('adToggle').onclick = async event => { state.adblock = !state.adblock; event.currentTarget.classList.toggle('on', state.adblock); $('adblock').classList.toggle('active', state.adblock); await window.brisa.setAdblock(state.adblock); save(); };
+  if (section === 'extensions') {
+    $('installExt').onclick = async () => { const result = await window.brisa.installExtension(); if (result.ok) { notify(`${result.name} instalada`); openSettings('extensions'); } else if (!result.canceled) notify(`Falha: ${result.error}`); };
+    $('panelContent').querySelectorAll('[data-remove]').forEach(button => button.onclick = async () => { await window.brisa.removeExtension(button.dataset.remove); openSettings('extensions'); });
+  }
+  if (section === 'import') $('panelContent').querySelectorAll('[data-import]').forEach(button => button.onclick = async () => {
+    button.disabled = true; button.textContent = 'Importando...'; const result = await window.brisa.importBookmarks(button.dataset.import);
+    if (!result.ok) { notify(result.error); openSettings('import'); return; }
+    const known = new Set(state.groups.flatMap(group => group.sites.map(site => site.url)));
+    result.groups.forEach(group => group.sites = group.sites.filter(site => !known.has(site.url)));
+    const imported = result.groups.filter(group => group.sites.length); state.groups.push(...imported); save(); renderGroups();
+    notify(`${imported.reduce((n, group) => n + group.sites.length, 0)} favoritos importados`); openSettings('import');
+  });
+}
+const openExtensions = () => openSettings('extensions');
 
 function renderThemes() {
   return Object.entries(themes).map(([id, label]) => `
@@ -358,8 +393,8 @@ $('adblock').onclick = async () => {
   notify(state.adblock ? 'Bloqueio ativado' : 'Bloqueio pausado');
 };
 $('extensions').onclick = openExtensions;
-$('customize').onclick = openCustomize;
-$('wallpaper').onclick = openCustomize;
+$('customize').onclick = () => openSettings('appearance');
+$('wallpaper').onclick = () => openSettings('appearance');
 $('panelClose').onclick = () => $('sidePanel').classList.add('hidden');
 $('addSite').onclick = () => {
   const group = state.groups[0] || { id: crypto.randomUUID(), name: 'Favoritos', sites: [] };
@@ -378,7 +413,7 @@ document.addEventListener('keydown', event => {
   if (event.altKey && event.key === 'ArrowLeft') tabs.find(tab => tab.id === activeId)?.page?.goBack();
   if (event.altKey && event.key === 'ArrowRight') tabs.find(tab => tab.id === activeId)?.page?.goForward();
 });
-window.brisa.onBlockedCount(count => $('blockedCount').textContent = count);
+window.brisa.onBlockedCount(count => { $('blockedCount').textContent = count; const settingsCount = $('settingsBlocked'); if (settingsCount) settingsCount.textContent = count; });
 window.brisa.onNewTab(url => { if (url) newTab(url); });
 window.brisa.adblockCount().then(count => $('blockedCount').textContent = count);
 if (!state.adblock) { $('adblock').classList.remove('active'); window.brisa.setAdblock(false); }
