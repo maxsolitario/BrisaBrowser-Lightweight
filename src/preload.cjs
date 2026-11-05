@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('brisa', {
   minimize: () => ipcRenderer.send('window:minimize'),
   toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   closeWindow: () => ipcRenderer.send('window:close'),
-  onBlockedCount: callback => ipcRenderer.on('adblock:count', (_event, count) => callback(count))
+  onBlockedCount: callback => ipcRenderer.on('adblock:count', (_event, count) => callback(count)),
+  onNewTab: callback => ipcRenderer.on('browser:new-tab', (_event, url) => callback(url))
 });

@@ -147,7 +147,6 @@ function navigate(tab, value) {
     const page = document.createElement('webview');
     page.className = 'page';
     page.setAttribute('partition', 'persist:brisa');
-    page.setAttribute('allowpopups', '');
     page.setAttribute('webpreferences', 'contextIsolation=yes,sandbox=yes');
     page.style.display = 'none';
     page.addEventListener('page-title-updated', event => {
@@ -380,6 +379,7 @@ document.addEventListener('keydown', event => {
   if (event.altKey && event.key === 'ArrowRight') tabs.find(tab => tab.id === activeId)?.page?.goForward();
 });
 window.brisa.onBlockedCount(count => $('blockedCount').textContent = count);
+window.brisa.onNewTab(url => { if (url) newTab(url); });
 window.brisa.adblockCount().then(count => $('blockedCount').textContent = count);
 if (!state.adblock) { $('adblock').classList.remove('active'); window.brisa.setAdblock(false); }
 applyTheme();

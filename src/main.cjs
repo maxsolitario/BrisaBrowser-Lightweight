@@ -50,6 +50,14 @@ function createWindow() {
     backgroundColor: '#101311', title: 'Brisa Browser', frame: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true }
   });
+  win.webContents.on('did-attach-webview', (_event, contents) => {
+    contents.setWindowOpenHandler(({ url }) => {
+      if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+        win?.webContents.send('browser:new-tab', url);
+      }
+      return { action: 'deny' };
+    });
+  });
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
