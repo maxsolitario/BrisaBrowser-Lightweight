@@ -1,0 +1,28 @@
+{
+  "name": "brisa-browser",
+  "version": "0.1.0",
+  "description": "Um navegador leve, personalizável e com bloqueio de anúncios.",
+  "main": "src/main.cjs",
+  "author": "Brisa Browser contributors",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable",
+    "dist:installer": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "dev.brisa.browser",
+    "productName": "Brisa Browser",
+    "asar": true,
+    "directories": { "output": "release" },
+    "files": ["src/**/*", "package.json"],
+    "win": { "target": ["nsis", "portable"], "artifactName": "Brisa-${version}-${arch}.${ext}" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true },
+    "portable": { "artifactName": "Brisa-${version}-portable-${arch}.${ext}" }
+  }
+}
