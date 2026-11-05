@@ -1,6 +1,6 @@
 {
   "name": "brisa-browser",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Um navegador leve, personalizável e com bloqueio de anúncios.",
   "main": "src/main.cjs",
   "author": "Brisa Browser contributors",

@@ -8,7 +8,7 @@ const initial = {
       { name: 'Spotify', url: 'https://open.spotify.com' }
     ]
   }],
-  theme: 'obsidian', wallpaper: 'default', adblock: true
+  theme: 'obsidian', wallpaper: 'default', adblock: true, bookmarksBar: []
 };
 const themes = {
   obsidian: 'Obsidiana', snow: 'Neve', midnight: 'Meia-noite', violet: 'Violeta', sand: 'Areia'
@@ -22,9 +22,16 @@ const wallpaperImages = {
 };
 
 let state;
+let migratedLegacyImports = false;
 try {
   const saved = JSON.parse(localStorage.getItem(storeKey) || '{}');
-  state = { ...initial, ...saved, groups: Array.isArray(saved.groups) ? saved.groups : initial.groups };
+  state = { ...initial, ...saved, groups: Array.isArray(saved.groups) ? saved.groups : initial.groups, bookmarksBar: Array.isArray(saved.bookmarksBar) ? saved.bookmarksBar : [] };
+  if (!Array.isArray(saved.bookmarksBar) && Array.isArray(saved.groups)) {
+    const imported = state.groups.filter(group => /^import-/.test(group.id || '') || /^(Google Chrome|Microsoft Edge|Brave)\s*[·-]/i.test(group.name || ''));
+    state.bookmarksBar.push(...imported.map(group => ({ type: 'folder', name: group.name.replace(/^(Google Chrome|Microsoft Edge|Brave)\s*[·-]\s*/i, ''), children: group.sites.map(site => ({ type: 'url', ...site })) })));
+    state.groups = state.groups.filter(group => !imported.includes(group));
+    migratedLegacyImports = imported.length > 0;
+  }
 } catch { state = structuredClone(initial); }
 if (!themes[state.theme]) state.theme = 'obsidian';
 if (!wallpaperImages[state.wallpaper]) state.wallpaper = 'default';
@@ -187,55 +194,110 @@ function addSiteToGroup(group) {
   renderGroups();
 }
 
+function faviconUrl(url) {
+  return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(url)}&sz=64`;
+}
+
+function createBookmarkLink(item, compact = false) {
+  const link = document.createElement('button');
+  link.className = 'bookmark-link';
+  link.type = 'button';
+  link.title = item.url;
+  const icon = document.createElement('img');
+  icon.alt = '';
+  icon.loading = 'lazy';
+  icon.src = faviconUrl(item.url);
+  icon.onerror = () => { icon.hidden = true; };
+  const label = document.createElement('span');
+  label.textContent = item.name;
+  link.append(icon, label);
+  link.addEventListener('click', () => newTab(item.url));
+  return link;
+}
+
+function renderBookmarkNodes(nodes, host, nested = false) {
+  for (const item of nodes) {
+    if (item.type === 'url') { host.append(createBookmarkLink(item)); continue; }
+    if (item.type !== 'folder') continue;
+    const folder = document.createElement('details');
+    folder.className = 'bookmark-folder';
+    const summary = document.createElement('summary');
+    summary.textContent = item.name;
+    const menu = document.createElement('div');
+    menu.className = 'bookmark-dropdown';
+    renderBookmarkNodes(item.children || [], menu, true);
+    const addSite = document.createElement('button');
+    addSite.className = 'bookmark-manage';
+    addSite.textContent = 'Adicionar favorito nesta pasta';
+    addSite.onclick = () => {
+      const name = prompt('Nome do favorito:'); const url = prompt('Endereço do site:');
+      if (!name || !url) return;
+      item.children ||= []; item.children.push({ type: 'url', name: name.trim(), url: normalizeAddress(url) }); save(); renderBookmarks();
+    };
+    const addFolder = document.createElement('button');
+    addFolder.className = 'bookmark-manage'; addFolder.textContent = 'Criar subpasta';
+    addFolder.onclick = () => { const name = prompt('Nome da pasta:'); if (!name?.trim()) return; item.children ||= []; item.children.push({ type: 'folder', name: name.trim(), children: [] }); save(); renderBookmarks(); };
+    menu.append(addSite, addFolder);
+    summary.addEventListener('contextmenu', event => {
+      event.preventDefault();
+      const action = prompt(`Pasta: ${item.name}\nDigite 1 para renomear ou 2 para excluir:`, '1');
+      if (action === '1') { const name = prompt('Novo nome:', item.name); if (name?.trim()) item.name = name.trim(); }
+      else if (action === '2' && confirm('Excluir esta pasta e seus favoritos?')) removeBookmarkNode(state.bookmarksBar, item);
+      save(); renderBookmarks();
+    });
+    folder.append(summary, menu);
+    host.append(folder);
+  }
+}
+
+function removeBookmarkNode(nodes, target) {
+  const index = nodes.indexOf(target);
+  if (index >= 0) { nodes.splice(index, 1); return true; }
+  return nodes.some(item => item.type === 'folder' && removeBookmarkNode(item.children || [], target));
+}
+
+function renderBookmarks() {
+  const host = $('bookmarkItems');
+  if (!host) return;
+  host.replaceChildren();
+  renderBookmarkNodes(state.bookmarksBar, host);
+}
+
 function renderGroups() {
   const host = $('groups');
   host.replaceChildren();
   state.groups.forEach(group => {
     const section = document.createElement('section');
     section.className = 'group';
-    const heading = document.createElement('div');
-    heading.className = 'group-title';
-    const dot = document.createElement('i');
-    dot.className = 'dot';
-    const name = document.createElement('span');
-    name.textContent = group.name;
-    const add = document.createElement('button');
-    add.className = 'group-add';
-    add.title = 'Adicionar site a este grupo';
-    add.textContent = '＋';
-    add.addEventListener('click', () => addSiteToGroup(group));
-    heading.append(dot, name, add);
     const sites = document.createElement('div');
     sites.className = 'group-sites';
-
     group.sites.forEach((site, index) => {
       const card = document.createElement('button');
-      card.className = 'site';
-      card.type = 'button';
-      card.title = `Abrir ${site.name}`;
-      const icon = document.createElement('span');
-      icon.className = 'site-icon';
-      icon.textContent = (site.name[0] || '•').toUpperCase();
-      const label = document.createElement('span');
-      label.textContent = site.name;
-      const remove = document.createElement('span');
-      remove.className = 'remove';
-      remove.textContent = '×';
-      remove.title = 'Remover atalho';
+      card.className = 'site'; card.type = 'button'; card.title = `Abrir ${site.name}`;
+      const icon = document.createElement('span'); icon.className = 'site-icon';
+      const image = document.createElement('img'); image.alt = ''; image.loading = 'lazy'; image.src = faviconUrl(site.url);
+      image.onerror = () => { image.remove(); icon.textContent = (site.name[0] || '?').toUpperCase(); };
+      icon.append(image);
+      const label = document.createElement('span'); label.textContent = site.name;
+      const remove = document.createElement('span'); remove.className = 'remove'; remove.textContent = '×'; remove.title = 'Remover atalho';
       card.append(icon, label, remove);
       card.addEventListener('click', event => {
-        if (event.target === remove) {
-          group.sites.splice(index, 1);
-          save();
-          renderGroups();
-        } else newTab(normalizeAddress(site.url));
+        if (event.target === remove) { group.sites.splice(index, 1); save(); renderGroups(); }
+        else newTab(site.url);
       });
       sites.append(card);
     });
-
-    section.append(heading, sites);
-    host.append(section);
+    section.append(sites); host.append(section);
   });
+  const add = document.createElement('button');
+  add.className = 'site-add'; add.type = 'button'; add.textContent = '+';
+  add.title = 'Adicionar favorito à Home'; add.setAttribute('aria-label', 'Adicionar favorito à Home');
+  add.onclick = () => {
+    const group = state.groups[0] || { id: crypto.randomUUID(), name: 'Favoritos', sites: [] };
+    if (!state.groups.length) state.groups.push(group);
+    addSiteToGroup(group);
+  };
+  host.append(add);
 }
 
 function openPanel(title, html) {
@@ -270,7 +332,7 @@ async function openSettings(section = 'appearance') {
   const sources = section === 'import' ? await window.brisa.findImportSources() : [];
   const nav = Object.entries(settingsSections).map(([id, name]) => `<button class="settings-nav ${id === section ? 'selected' : ''}" data-settings="${id}">${name}</button>`).join('');
   let content = '';
-  if (section === 'appearance') content = `<h3>Pagina inicial</h3><p>Personalize os temas, o papel de parede e os atalhos da Home.</p><button class="panel-action" id="openAppearance">Abrir personalizacao</button>`;
+  if (section === 'appearance') content = `<section class="settings-section"><h3>Aparência</h3><div class="theme-grid">${renderThemes()}</div></section><section class="settings-section"><h3>Papel de parede</h3><div class="wallpaper-grid">${renderWallpapers()}</div><label class="panel-action file-action">Escolher imagem do computador<input id="wallFile" type="file" accept="image/*" hidden></label>${state.customWallpaper ? '<button class="panel-action" id="removeWallpaper">Remover imagem atual</button>' : ''}</section>`;
   if (section === 'privacy') content = `<h3>Protecao na navegacao</h3><div class="settings-row"><div><strong>Bloquear anuncios e rastreadores</strong><small>Usa listas de filtros atualizadas.</small></div><button id="adToggle" class="toggle ${state.adblock ? 'on' : ''}" aria-label="Alternar bloqueio"></button></div><div class="settings-row"><div><strong>Pedidos bloqueados nesta sessao</strong></div><b>${$('blockedCount').textContent}</b></div><p>Alguns anuncios incluidos diretamente no conteudo do site ainda podem aparecer.</p>`;
   if (section === 'extensions') {
     const rows = extensions.length ? extensions.map(item => `<article class="ext-row"><span class="ext-icon">◇</span><div class="ext-info"><strong>${escapeHtml(item.name)}</strong><small>Versao ${escapeHtml(item.version)}</small></div><button data-remove="${escapeHtml(item.id)}">Remover</button></article>`).join('') : '<div class="empty-state"><strong>Nenhuma extensao instalada</strong><p>Escolha a pasta descompactada de uma extensao compativel do Chromium.</p></div>';
@@ -278,11 +340,16 @@ async function openSettings(section = 'appearance') {
   }
   if (section === 'import') {
     const rows = sources.length ? sources.map(source => `<article class="import-row"><div><strong>${escapeHtml(source.name)}</strong><small>Favoritos</small></div><button data-import="${escapeHtml(source.id)}">Importar</button></article>`).join('') : '<div class="empty-state"><strong>Nenhum perfil encontrado</strong><p>Instale o Chrome, Edge ou Brave neste computador para importar favoritos.</p></div>';
-    content = `<h3>Importar de outro navegador</h3><p>Os favoritos serao organizados em grupos na Home.</p>${rows}<div class="info-note"><strong>Importacao disponivel</strong><p>Favoritos e pastas. Senhas, historico e cookies nao sao importados.</p></div>`;
+    content = `<h3>Importar de outro navegador</h3><p>Favoritos e pastas serão adicionados à barra de favoritos.</p>${rows}<div class="info-note"><strong>Importação disponível</strong><p>Senhas, histórico e cookies não são importados.</p></div>`;
   }
   openPanel('Configuracoes', `<div class="settings-layout"><nav class="settings-nav-list">${nav}</nav><div class="settings-content">${content}</div></div>`);
   $('panelContent').querySelectorAll('[data-settings]').forEach(button => button.onclick = () => openSettings(button.dataset.settings));
-  if (section === 'appearance') $('openAppearance').onclick = openCustomize;
+  if (section === 'appearance') {
+    $('panelContent').querySelectorAll('[data-theme-choice]').forEach(button => button.onclick = () => { state.theme = button.dataset.themeChoice; applyTheme(); save(); openSettings('appearance'); });
+    $('panelContent').querySelectorAll('[data-wall-choice]').forEach(button => button.onclick = () => { state.wallpaper = button.dataset.wallChoice; state.customWallpaper = ''; applyWallpaper(); save(); openSettings('appearance'); });
+    $('wallFile').onchange = async event => { const file = event.target.files[0]; if (!file) return; try { const bitmap = await createImageBitmap(file); const scale = Math.min(1, 1920 / bitmap.width, 1200 / bitmap.height); const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); state.customWallpaper = canvas.toDataURL('image/jpeg', 0.78); bitmap.close(); applyWallpaper(); save(); openSettings('appearance'); } catch { notify('Não consegui abrir essa imagem.'); } };
+    $('removeWallpaper')?.addEventListener('click', () => { state.customWallpaper = ''; state.wallpaper = 'default'; applyWallpaper(); save(); openSettings('appearance'); });
+  }
   if (section === 'privacy') $('adToggle').onclick = async event => { state.adblock = !state.adblock; event.currentTarget.classList.toggle('on', state.adblock); $('adblock').classList.toggle('active', state.adblock); await window.brisa.setAdblock(state.adblock); save(); };
   if (section === 'extensions') {
     $('installExt').onclick = async () => { const result = await window.brisa.installExtension(); if (result.ok) { notify(`${result.name} instalada`); openSettings('extensions'); } else if (!result.canceled) notify(`Falha: ${result.error}`); };
@@ -291,10 +358,13 @@ async function openSettings(section = 'appearance') {
   if (section === 'import') $('panelContent').querySelectorAll('[data-import]').forEach(button => button.onclick = async () => {
     button.disabled = true; button.textContent = 'Importando...'; const result = await window.brisa.importBookmarks(button.dataset.import);
     if (!result.ok) { notify(result.error); openSettings('import'); return; }
-    const known = new Set(state.groups.flatMap(group => group.sites.map(site => site.url)));
-    result.groups.forEach(group => group.sites = group.sites.filter(site => !known.has(site.url)));
-    const imported = result.groups.filter(group => group.sites.length); state.groups.push(...imported); save(); renderGroups();
-    notify(`${imported.reduce((n, group) => n + group.sites.length, 0)} favoritos importados`); openSettings('import');
+    const known = new Set();
+    const collect = items => items.forEach(item => { if (item.type === 'url') known.add(item.url); else collect(item.children || []); });
+    collect(state.bookmarksBar);
+    const clean = items => items.map(item => item.type === 'url' ? (known.has(item.url) ? null : item) : ({ ...item, children: clean(item.children || []) })).filter(Boolean);
+    const folders = clean(result.folders);
+    state.bookmarksBar.push(...folders); save(); renderBookmarks();
+    notify('Favoritos importados para a barra'); openSettings('import');
   });
 }
 const openExtensions = () => openSettings('extensions');
@@ -376,6 +446,20 @@ function openCustomize() {
 }
 
 $('newTab').onclick = () => newTab();
+$('bookmarkAdd').onclick = event => { event.stopPropagation(); $('bookmarkMenu').classList.toggle('hidden'); };
+$('bookmarkCurrent').onclick = () => {
+  const tab = tabs.find(item => item.id === activeId);
+  if (!tab?.url || !/^https?:/i.test(tab.url)) { notify('Abra um site antes de salvá-lo nos favoritos.'); return; }
+  const name = prompt('Nome do favorito:', tab.title) || tab.title;
+  state.bookmarksBar.push({ type: 'url', name: name.trim(), url: tab.url });
+  save(); renderBookmarks(); $('bookmarkMenu').classList.add('hidden');
+};
+$('bookmarkFolder').onclick = () => {
+  const name = prompt('Nome da pasta:'); if (!name?.trim()) return;
+  state.bookmarksBar.push({ type: 'folder', name: name.trim(), children: [] });
+  save(); renderBookmarks(); $('bookmarkMenu').classList.add('hidden');
+};
+document.addEventListener('click', event => { if (!event.target.closest('#bookmarkMenu') && !event.target.closest('#bookmarkAdd')) $('bookmarkMenu').classList.add('hidden'); });
 $('back').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.goBack();
 $('forward').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.goForward();
 $('reload').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.reload();
@@ -420,4 +504,6 @@ if (!state.adblock) { $('adblock').classList.remove('active'); window.brisa.setA
 applyTheme();
 applyWallpaper();
 renderGroups();
+renderBookmarks();
+if (migratedLegacyImports) save();
 newTab();

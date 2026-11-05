@@ -75,21 +75,19 @@ function findBookmarkProfiles() {
   });
 }
 
-function readBookmarkGroups(bookmarkFile, browserName) {
+function readBookmarkTree(bookmarkFile) {
   const data = JSON.parse(fs.readFileSync(bookmarkFile, 'utf8'));
-  const roots = data.roots || {};
-  const groups = [];
-  const collect = (node, groupName) => {
-    const sites = [];
-    const walk = item => {
-      if (item.type === 'url' && /^https?:\/\//i.test(item.url || '')) sites.push({ name: item.name || new URL(item.url).hostname, url: item.url });
-      else if (item.type === 'folder') item.children?.forEach(walk);
-    };
-    node.children?.forEach(walk);
-    if (sites.length) groups.push({ id: `import-${Date.now()}-${groups.length}`, name: `${browserName} · ${groupName}`, sites: sites.slice(0, 80) });
+  const convert = item => {
+    if (item.type === 'url' && /^https?:\/\//i.test(item.url || '')) return { type: 'url', name: item.name || new URL(item.url).hostname, url: item.url };
+    if (item.type === 'folder') return { type: 'folder', name: item.name || 'Pasta', children: (item.children || []).map(convert).filter(Boolean) };
+    return null;
   };
-  for (const key of ['bookmark_bar', 'other', 'synced']) if (roots[key]) collect(roots[key], roots[key].name || key);
-  return groups;
+  return ['bookmark_bar', 'other', 'synced'].flatMap(key => {
+    const root = data.roots?.[key];
+    if (!root) return [];
+    const children = (root.children || []).map(convert).filter(Boolean);
+    return children.length ? [{ type: 'folder', name: root.name || key, children }] : [];
+  });
 }
 
 function createWindow() {
@@ -140,8 +138,8 @@ ipcMain.handle('browser:import-bookmarks', (_event, id) => {
   if (!source) return { ok: false, error: 'Não encontrei esse perfil. Feche e abra as configurações e tente novamente.' };
   try {
     const browserName = source.name.split(' — ')[0];
-    const groups = readBookmarkGroups(source.file, browserName);
-    return groups.length ? { ok: true, groups } : { ok: false, error: 'Esse perfil não tem favoritos compatíveis para importar.' };
+    const folders = readBookmarkTree(source.file).map(folder => ({ ...folder, name: `${browserName} · ${folder.name}` }));
+    return folders.length ? { ok: true, folders } : { ok: false, error: 'Esse perfil não tem favoritos compatíveis para importar.' };
   } catch (error) { return { ok: false, error: `Não foi possível ler os favoritos: ${error.message}` }; }
 });
 ipcMain.handle('browser:remove-extension', async (_event, id) => {
