@@ -103,6 +103,15 @@ button:hover { color: var(--accent); }
 .tab-title { flex: 1; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .tab-x { color: var(--muted); font-size: 16px; }
 .new-tab { width: 30px; height: 30px; border-radius: 8px; color: var(--muted); font-size: 20px; }
+.tabs-overview { display:grid; place-items:center; width:28px; height:28px; flex:0 0 28px; color:var(--muted); background:var(--chrome-raised); border:1px solid var(--line); border-radius:8px; font-size:11px; font-variant-numeric:tabular-nums; }
+.tabs-overview:hover { color:var(--text); background:var(--surface-raised); }
+.tabs-switcher { position:absolute; z-index:15; top:44px; right:88px; display:grid; width:min(300px, calc(100vw - 24px)); max-height:65vh; overflow:auto; padding:6px; background:var(--surface); border:1px solid var(--line); border-radius:10px; box-shadow:0 14px 34px #0007; }
+.tabs-switcher.hidden { display:none; }
+.tabs-switcher-row { display:flex; align-items:center; gap:4px; }
+.tabs-switcher-select { min-width:0; flex:1; overflow:hidden; padding:9px 10px; color:var(--text); border-radius:7px; text-align:left; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+.tabs-switcher-row[aria-current="true"] .tabs-switcher-select, .tabs-switcher-select:hover { background:var(--surface-raised); }
+.tabs-switcher-close { display:grid; place-items:center; width:30px; height:30px; flex:0 0 30px; color:var(--muted); border-radius:7px; font-size:17px; }
+.tabs-switcher-close:hover { color:var(--text); background:var(--surface-raised); }
 .window-actions { display: flex; margin-left: auto; }
 .window-actions button { width: 35px; height: 32px; color: var(--muted); font-size: 17px; }
 .window-actions button:last-child:hover { color: #fff; background: #b64e4e; }
@@ -115,8 +124,17 @@ button:hover { color: var(--accent); }
 .address-wrap input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 13px; }
 .address-wrap input::placeholder { color: var(--muted); }
 .address-wrap #go { color: var(--accent); }
+.address-wrap .save-bookmark { display:grid; place-items:center; width:28px; height:28px; flex:0 0 28px; color:var(--muted); border-radius:7px; }
+.address-wrap .save-bookmark svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.address-wrap .save-bookmark:hover, .address-wrap .save-bookmark.saved { color:var(--accent); background:color-mix(in srgb, var(--accent) 13%, transparent); }
+.address-wrap .save-bookmark.saved svg { fill:color-mix(in srgb, var(--accent) 24%, transparent); }
 .tool-pill { height: 34px; padding: 0 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; white-space: nowrap; }
 .tool-pill.active { color: var(--accent); background: var(--surface-raised); }
+.tool-pill:not(.active) { color:var(--muted); background:transparent; }
+.shield-icon { display:inline-grid; place-items:center; width:17px; height:17px; vertical-align:middle; }
+.shield-icon svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+#adblockStatus { margin:0 4px; font-size:11px; }
+#blockedCount { min-width:18px; padding:2px 5px; background:var(--surface); border-radius:8px; text-align:center; font-size:10px; font-variant-numeric:tabular-nums; }
 .icon-button { border: 1px solid var(--line); font-size: 17px; }
 
 .stage { position: relative; height: calc(100vh - 112px); overflow: hidden; background: var(--page); }
@@ -268,11 +286,13 @@ button:active { transform: scale(.97); }
 .bookmark-link img { width:16px; height:16px; object-fit:contain; }
 .bookmark-link span { overflow:hidden; text-overflow:ellipsis; }
 .bookmark-folder { position:relative; flex:0 0 auto; }
-.bookmark-folder summary::before { content:'▸'; color:var(--muted); font-size:11px; }
-.bookmark-folder[open] > summary::before { content:'▾'; }
-.bookmark-folder > .bookmark-dropdown { position:absolute; z-index:7; top:30px; left:0; min-width:220px; max-height:65vh; overflow:auto; padding:6px; background:var(--surface); border:1px solid var(--line); border-radius:9px; box-shadow:0 12px 28px #0005; }
+.bookmark-folder summary::before { content:none; }
+.bookmark-folder summary::after { content:'›'; margin-left:auto; color:var(--muted); font-size:16px; }
+.bookmark-folder-icon { width:16px; height:16px; flex:0 0 16px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linejoin:round; }
+.bookmark-folder-name { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.bookmark-folder > .bookmark-dropdown { position:fixed; z-index:16; top:0; left:0; display:grid; min-width:220px; max-height:65vh; overflow:auto; padding:6px; background:var(--surface); border:1px solid var(--line); border-radius:9px; box-shadow:0 12px 28px #0006; }
 .bookmark-dropdown .bookmark-link, .bookmark-dropdown .bookmark-folder summary { width:100%; max-width:none; }
-.bookmark-dropdown .bookmark-folder > .bookmark-dropdown { position:static; max-height:none; margin-left:12px; box-shadow:none; }
+.bookmark-dropdown .bookmark-link { justify-content:flex-start; height:34px; }
 .bookmark-add { width:26px; height:26px; flex:0 0 auto; color:var(--muted); border-radius:6px; font-size:18px; }
 .bookmark-add:hover { color:var(--text); background:var(--surface-raised); }
 .bookmark-menu-root { position:absolute; z-index:8; top:30px; right:14px; display:grid; min-width:230px; padding:6px; background:var(--surface); border:1px solid var(--line); border-radius:9px; box-shadow:0 12px 28px #0005; }

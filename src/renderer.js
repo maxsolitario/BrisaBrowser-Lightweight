@@ -56,6 +56,10 @@ async function setAdblockEnabled(enabled, { showNotice = false } = {}) {
   state.adblock = !!enabled;
   state.adblock = await window.brisa.setAdblock(state.adblock);
   $('adblock').classList.toggle('active', state.adblock);
+  $('adblockStatus').textContent = state.adblock ? 'Ativo' : 'Pausado';
+  $('adblock').title = `Bloqueio de anúncios ${state.adblock ? 'ativo' : 'pausado'}`;
+  $('adblock').setAttribute('aria-label', `Bloqueio de anúncios ${state.adblock ? 'ativo' : 'pausado'}`);
+  $('adblock').setAttribute('aria-pressed', String(state.adblock));
   $('adToggle')?.classList.toggle('on', state.adblock);
   save();
   if (showNotice) notify(state.adblock ? 'Bloqueio ativado' : 'Bloqueio pausado');
@@ -99,6 +103,9 @@ function resizePages() {
 function renderTabs() {
   const host = $('tabs');
   host.replaceChildren();
+  $('tabCount').textContent = String(tabs.length);
+  $('tabsOverview').title = `${tabs.length} ${tabs.length === 1 ? 'aba aberta' : 'abas abertas'}`;
+  $('tabsOverview').setAttribute('aria-label', $('tabsOverview').title);
   tabs.forEach(tab => {
     const item = document.createElement('div');
     item.className = `tab ${tab.id === activeId ? 'active' : ''}`;
@@ -118,6 +125,40 @@ function renderTabs() {
     item.append(icon, title, close);
     host.append(item);
   });
+  const switcher = $('tabsSwitcher');
+  switcher.replaceChildren();
+  tabs.forEach(tab => {
+    const row = document.createElement('div'); row.className = 'tabs-switcher-row';
+    row.setAttribute('aria-current', String(tab.id === activeId));
+    const select = document.createElement('button'); select.className = 'tabs-switcher-select'; select.type = 'button';
+    select.textContent = tab.title; select.title = tab.url || 'Nova aba';
+    select.onclick = () => { activate(tab.id); switcher.classList.add('hidden'); };
+    const close = document.createElement('button'); close.className = 'tabs-switcher-close'; close.type = 'button';
+    close.textContent = '×'; close.title = `Fechar ${tab.title}`; close.setAttribute('aria-label', close.title);
+    close.onclick = () => closeTab(tab.id);
+    row.append(select, close); switcher.append(row);
+  });
+}
+
+function findBookmarkByUrl(nodes, url) {
+  for (const item of nodes) {
+    if (item.type === 'url' && item.url === url) return item;
+    if (item.type === 'folder') {
+      const nested = findBookmarkByUrl(item.children || [], url);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function updateSaveBookmark() {
+  const tab = tabs.find(item => item.id === activeId);
+  const saved = !!tab?.url && !!findBookmarkByUrl(state.bookmarksBar, tab.url);
+  const button = $('saveBookmark');
+  button.classList.toggle('saved', saved);
+  button.title = saved ? 'Remover dos favoritos' : 'Salvar nos favoritos';
+  button.setAttribute('aria-label', button.title);
+  button.setAttribute('aria-pressed', String(saved));
 }
 
 function activate(id) {
@@ -130,6 +171,7 @@ function activate(id) {
   $('address').placeholder = tab.home ? 'Pesquise ou digite um endereço' : 'Endereço';
   if (tab.page) requestAnimationFrame(resizePages);
   renderTabs();
+  updateSaveBookmark();
 }
 
 function newTab(url = '') {
@@ -172,6 +214,7 @@ function navigate(tab, value) {
     page.addEventListener('did-navigate', event => {
       tab.url = event.url;
       if (tab.id === activeId) $('address').value = event.url;
+      if (tab.id === activeId) updateSaveBookmark();
     });
     page.addEventListener('did-fail-load', event => {
       if (event.errorCode !== -3) notify('Não foi possível carregar esta página.');
@@ -220,7 +263,10 @@ function createBookmarkLink(item, compact = false) {
   const label = document.createElement('span');
   label.textContent = item.name;
   link.append(icon, label);
-  link.addEventListener('click', () => newTab(item.url));
+  link.addEventListener('click', () => {
+    document.querySelectorAll('.bookmark-folder[open]').forEach(folder => { folder.open = false; });
+    newTab(item.url);
+  });
   link.addEventListener('contextmenu', event => {
     event.preventDefault();
     showBookmarkMenu(event.clientX, event.clientY, [
@@ -261,7 +307,7 @@ function renameBookmark(item) {
 
 function deleteBookmark(item) {
   if (!confirm(`Deletar ${item.type === 'folder' ? 'a pasta e seus favoritos' : 'este favorito'}?`)) return;
-  removeBookmarkNode(state.bookmarksBar, item); save(); renderBookmarks();
+  removeBookmarkNode(state.bookmarksBar, item); save(); renderBookmarks(); updateSaveBookmark();
 }
 
 function renderBookmarkNodes(nodes, host, nested = false) {
@@ -271,10 +317,32 @@ function renderBookmarkNodes(nodes, host, nested = false) {
     const folder = document.createElement('details');
     folder.className = 'bookmark-folder';
     const summary = document.createElement('summary');
-    summary.textContent = item.name;
+    const folderIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    folderIcon.setAttribute('viewBox', '0 0 24 24'); folderIcon.setAttribute('aria-hidden', 'true'); folderIcon.classList.add('bookmark-folder-icon');
+    const folderPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    folderPath.setAttribute('d', 'M3 6.5h7l2 2h9v9.8a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 18.3V6.5Z'); folderIcon.append(folderPath);
+    const folderName = document.createElement('span'); folderName.className = 'bookmark-folder-name'; folderName.textContent = item.name;
+    summary.append(folderIcon, folderName);
     const menu = document.createElement('div');
     menu.className = 'bookmark-dropdown';
     renderBookmarkNodes(item.children || [], menu, true);
+    folder.addEventListener('toggle', () => {
+      if (folder.open) {
+        for (const sibling of host.querySelectorAll(':scope > .bookmark-folder[open]')) {
+          if (sibling !== folder) sibling.open = false;
+        }
+        const rect = summary.getBoundingClientRect();
+        const width = Math.min(272, innerWidth - 16);
+        const height = Math.min(menu.scrollHeight, innerHeight - 16);
+        let left = nested ? rect.right - 4 : rect.left;
+        if (left + width > innerWidth - 8) left = nested ? rect.left - width + 4 : innerWidth - width - 8;
+        let top = nested ? rect.top : rect.bottom - 1;
+        if (top + height > innerHeight - 8) top = Math.max(8, rect.top - height + 1);
+        menu.style.width = `${width}px`; menu.style.left = `${Math.max(8, left)}px`; menu.style.top = `${top}px`;
+      } else {
+        menu.querySelectorAll('.bookmark-folder[open]').forEach(child => { child.open = false; });
+      }
+    });
     const addSite = document.createElement('button');
     addSite.className = 'bookmark-manage';
     addSite.textContent = 'Adicionar favorito nesta pasta';
@@ -315,6 +383,7 @@ function renderBookmarks() {
   if (!host) return;
   host.replaceChildren();
   renderBookmarkNodes(state.bookmarksBar, host);
+  if (typeof updateSaveBookmark === 'function') updateSaveBookmark();
 }
 
 function renderGroups() {
@@ -387,7 +456,7 @@ async function openSettings(section = 'appearance') {
   const nav = Object.entries(settingsSections).map(([id, name]) => `<button class="settings-nav ${id === section ? 'selected' : ''}" data-settings="${id}">${name}</button>`).join('');
   let content = '';
   if (section === 'appearance') content = `<section class="settings-section"><h3>Aparência</h3><div class="theme-grid">${renderThemes()}</div></section><section class="settings-section"><h3>Papel de parede</h3><div class="wallpaper-grid">${renderWallpapers()}</div><label class="panel-action file-action">Escolher imagem do computador<input id="wallFile" type="file" accept="image/*" hidden></label>${state.customWallpaper ? '<button class="panel-action" id="removeWallpaper">Remover imagem atual</button>' : ''}</section>`;
-  if (section === 'privacy') content = `<h3>Protecao na navegacao</h3><div class="settings-row"><div><strong>Bloquear anuncios e rastreadores</strong><small>Usa listas de filtros; se não puder carregá-las, aplica uma lista local reduzida.</small></div><button id="adToggle" class="toggle ${state.adblock ? 'on' : ''}" aria-label="Alternar bloqueio"></button></div><div class="settings-row"><div><strong>Pedidos bloqueados nesta sessao</strong></div><b id="settingsBlocked">${$('blockedCount').textContent}</b></div><p>Alguns anuncios incluídos diretamente no conteúdo do site ainda podem aparecer. O bloqueio não interfere nos domínios de vídeo.</p>`;
+  if (section === 'privacy') content = `<h3>Protecao na navegacao</h3><div class="settings-row"><div><strong>Bloquear anuncios e rastreadores</strong><small>Usa listas de filtros; se não puder carregá-las, aplica uma lista local reduzida.</small></div><button id="adToggle" class="toggle ${state.adblock ? 'on' : ''}" aria-label="Alternar bloqueio"></button></div><div class="settings-row"><div><strong>Pedidos bloqueados nesta sessao</strong></div><b id="settingsBlocked">${$('blockedCount').textContent}</b></div><p>O bloqueador mantém os fluxos de vídeo do YouTube fora dos filtros de rede para evitar falhas. Anúncios entregues no próprio fluxo de vídeo ainda podem aparecer.</p>`;
   if (section === 'extensions') {
     const rows = extensions.length ? extensions.map(item => `<article class="ext-row"><span class="ext-icon">◇</span><div class="ext-info"><strong>${escapeHtml(item.name)}</strong><small>Versao ${escapeHtml(item.version)}</small></div><button data-remove="${escapeHtml(item.id)}">Remover</button></article>`).join('') : '<div class="empty-state"><strong>Nenhuma extensao instalada</strong><p>Escolha a pasta descompactada de uma extensao compativel do Chromium.</p></div>';
     content = `<h3>Extensoes instaladas <span class="count-badge">${extensions.length}</span></h3><p>Gerencie os complementos deste navegador.</p>${rows}<button class="panel-action primary-action" id="installExt">+ Instalar extensao do computador</button><div class="info-note"><strong>Como instalar</strong><p>Descompacte a extensao e selecione a pasta que contem manifest.json. Alguns recursos do Chrome podem nao funcionar no Brisa.</p></div>`;
@@ -509,8 +578,33 @@ $('bookmarkFolder').onclick = () => {
   state.bookmarksBar.push({ type: 'folder', name: name.trim(), children: [] });
   save(); renderBookmarks(); $('bookmarkMenu').classList.add('hidden');
 };
+$('tabsOverview').onclick = event => {
+  event.stopPropagation();
+  $('tabsSwitcher').classList.toggle('hidden');
+  renderTabs();
+};
+$('saveBookmark').onclick = () => {
+  const tab = tabs.find(item => item.id === activeId);
+  if (!tab?.url || !/^https?:/i.test(tab.url)) { notify('Abra um site antes de salvá-lo nos favoritos.'); return; }
+  const existing = findBookmarkByUrl(state.bookmarksBar, tab.url);
+  if (existing) {
+    if (!confirm('Remover esta página dos favoritos?')) return;
+    removeBookmarkNode(state.bookmarksBar, existing);
+    notify('Favorito removido');
+  } else {
+    const name = prompt('Salvar nos favoritos:', tab.title || safeHostname(tab.url));
+    if (!name?.trim()) return;
+    state.bookmarksBar.push({ type: 'url', name: name.trim(), url: tab.url });
+    notify('Página salva nos favoritos');
+  }
+  save(); renderBookmarks(); updateSaveBookmark();
+};
 document.addEventListener('click', event => { if (!event.target.closest('#bookmarkMenu') && !event.target.closest('#bookmarkAdd')) $('bookmarkMenu').classList.add('hidden'); });
 document.addEventListener('click', event => { if (!event.target.closest('#bookmarkContextMenu')) $('bookmarkContextMenu').classList.add('hidden'); });
+document.addEventListener('click', event => { if (!event.target.closest('#tabsSwitcher') && !event.target.closest('#tabsOverview')) $('tabsSwitcher').classList.add('hidden'); });
+document.addEventListener('pointerdown', event => {
+  if (!event.target.closest('.bookmark-bar')) document.querySelectorAll('.bookmark-folder[open]').forEach(folder => { folder.open = false; });
+});
 document.addEventListener('keydown', event => { if (event.key === 'Escape') $('bookmarkContextMenu').classList.add('hidden'); });
 $('back').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.goBack();
 $('forward').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.goForward();

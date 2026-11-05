@@ -13,6 +13,8 @@
       <div class="brand"><span class="brand-mark">b</span><span>brisa</span></div>
       <div id="tabs" class="tabs"></div>
       <button id="newTab" class="new-tab" title="Nova aba" aria-label="Nova aba">＋</button>
+      <button id="tabsOverview" class="tabs-overview" title="Todas as abas" aria-label="Todas as abas"><span id="tabCount">1</span></button>
+      <div id="tabsSwitcher" class="tabs-switcher hidden" role="menu"></div>
       <div class="window-actions">
         <button id="minimize" title="Minimizar" aria-label="Minimizar">−</button>
         <button id="maximize" title="Maximizar" aria-label="Maximizar">□</button>
@@ -28,9 +30,10 @@
       <div class="address-wrap">
         <span class="secure" aria-hidden="true">◈</span>
         <input id="address" spellcheck="false" placeholder="Pesquise ou digite um endereço" aria-label="Endereço ou pesquisa">
+        <button id="saveBookmark" class="save-bookmark" title="Salvar nos favoritos" aria-label="Salvar página nos favoritos" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.75 5.58 6.16.9-4.46 4.35 1.05 6.14L12 17.07l-5.5 2.9 1.05-6.14-4.46-4.35 6.16-.9L12 3Z"/></svg></button>
         <button id="go" title="Ir" aria-label="Ir">↵</button>
       </div>
-      <button id="adblock" class="tool-pill active" title="Bloqueio de anúncios">✳ <span id="blockedCount">0</span></button>
+      <button id="adblock" class="tool-pill active" title="Bloqueio de anúncios ativo" aria-label="Bloqueio de anúncios ativo" aria-pressed="true"><span class="shield-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 19 6v5c0 4.6-2.8 8.3-7 10-4.2-1.7-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span><span id="adblockStatus">Ativo</span><span id="blockedCount">0</span></button>
       <button id="extensions" class="icon-button" title="Extensões" aria-label="Extensões">◇</button>
       <button id="customize" class="icon-button" title="Personalizar" aria-label="Personalizar">☷</button>
     </div>

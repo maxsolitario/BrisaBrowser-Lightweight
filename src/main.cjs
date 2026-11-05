@@ -50,6 +50,9 @@ async function installBlocker(ses) {
     });
     const onBeforeRequest = adblocker.onBeforeRequest.bind(adblocker);
     adblocker.onBeforeRequest = (details, callback) => onBeforeRequest(details, response => {
+      // Some filter lists match YouTube's shared video CDN. Keep media segments
+      // flowing while continuing to filter the player, page and ad endpoints.
+      if (isYouTubeMediaRequest(details)) { callback({}); return; }
       if (response.cancel) { blockedCount++; updateBlockedCount(); }
       callback(response);
     });
@@ -59,6 +62,7 @@ async function installBlocker(ses) {
     console.error('Não foi possível carregar as listas de bloqueio:', error);
     // Fallback reduzido para o navegador ainda bloquear domínios de anúncio comuns offline.
     ses.webRequest.onBeforeRequest((details, callback) => {
+      if (isYouTubeMediaRequest(details)) { callback({}); return; }
       let hostname = '';
       try { hostname = new URL(details.url).hostname.toLowerCase(); } catch {}
       const blocked = adblockEnabled && fallbackAdDomains.some(host => hostname === host || hostname.endsWith(`.${host}`));
@@ -66,6 +70,12 @@ async function installBlocker(ses) {
       callback({ cancel: blocked });
     });
   }
+}
+
+function isYouTubeMediaRequest(details) {
+  if (details.resourceType !== 'media') return false;
+  try { return /(?:^|\.)googlevideo\.com$/i.test(new URL(details.url).hostname); }
+  catch { return false; }
 }
 
 function findBookmarkProfiles() {
