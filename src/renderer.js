@@ -108,7 +108,7 @@ function activate(id) {
   activeId = id;
   const tab = tabs.find(item => item.id === id);
   if (!tab) return;
-  tabs.forEach(item => { if (item.page) item.page.style.display = item.id === id ? 'block' : 'none'; });
+  tabs.forEach(item => { if (item.page) item.page.style.display = item.id === id ? 'flex' : 'none'; });
   $('home').style.display = tab.home ? 'block' : 'none';
   $('address').value = tab.url || '';
   $('address').placeholder = tab.home ? 'Pesquise ou digite um endereço' : 'Endereço';
@@ -166,7 +166,7 @@ function navigate(tab, value) {
   }
 
   activeId = tab.id;
-  tab.page.style.display = 'block';
+  tab.page.style.display = 'flex';
   renderTabs();
   requestAnimationFrame(() => {
     resizePages();
