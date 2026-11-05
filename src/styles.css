@@ -163,6 +163,10 @@ body[data-theme="snow"] .wallpaper-shade, body[data-theme="sand"] .wallpaper-sha
 .panel-head small { color: var(--muted); font: 9px var(--mono); letter-spacing: .13em; }
 .panel-head h2 { margin: 7px 0 0; font-size: 21px; font-weight: 600; letter-spacing: -.04em; }
 .panel-head button { color: var(--muted); font-size: 22px; }
+.panel-head { align-items: center; min-height: 48px; }
+.panel-head button#panelClose { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; margin: -4px -4px 0 12px; color: var(--text); background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px; font: 500 23px/1 "Segoe UI", sans-serif; opacity: 1; }
+.panel-head button#panelClose:hover { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.panel-head button#panelClose:focus-visible, .bookmark-context-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .panel-section { margin: 16px 0; }
 .panel-section h3 { margin: 0 0 9px; font-size: 12px; }
 .panel-section p { color: var(--muted); font-size: 11px; line-height: 1.55; }
@@ -278,6 +282,10 @@ button:active { transform: scale(.97); }
 .bookmark-manage:hover { color:var(--text); background:var(--surface-raised); }
 .bookmark-menu-root button { padding:10px; border-radius:6px; text-align:left; font-size:12px; }
 .bookmark-menu-root button:hover { background:var(--surface-raised); }
+.bookmark-context-menu { position:fixed; z-index:20; display:grid; min-width:220px; padding:5px; background:var(--surface); border:1px solid var(--line); border-radius:9px; box-shadow:0 12px 28px #0007; }
+.bookmark-context-menu.hidden { display:none; }
+.bookmark-context-menu button { min-height:34px; padding:8px 10px; color:var(--text); border-radius:6px; text-align:left; font-size:12px; white-space:nowrap; }
+.bookmark-context-menu button:hover { background:var(--surface-raised); }
 .home-top { display:none; }
 .home-bottom { display:none; }
 .home-caption { display:none; }

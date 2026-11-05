@@ -8,9 +8,11 @@ contextBridge.exposeInMainWorld('brisa', {
   setAdblock: enabled => ipcRenderer.invoke('browser:adblock-toggle', enabled),
   adblockCount: () => ipcRenderer.invoke('browser:adblock-count'),
   openExternal: url => ipcRenderer.invoke('browser:open-external', url),
+  openWindowTabs: urls => ipcRenderer.invoke('browser:open-window-tabs', urls),
   minimize: () => ipcRenderer.send('window:minimize'),
   toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   closeWindow: () => ipcRenderer.send('window:close'),
   onBlockedCount: callback => ipcRenderer.on('adblock:count', (_event, count) => callback(count)),
-  onNewTab: callback => ipcRenderer.on('browser:new-tab', (_event, url) => callback(url))
+  onNewTab: callback => ipcRenderer.on('browser:new-tab', (_event, url) => callback(url)),
+  onOpenTabs: callback => ipcRenderer.on('browser:open-tabs', (_event, urls) => callback(urls))
 });

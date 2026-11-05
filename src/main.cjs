@@ -10,9 +10,19 @@ let adblockEnabled = true;
 let adblocker;
 let adblockActive = false;
 const extensionPaths = new Map();
+const fallbackAdDomains = [
+  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com', 'adservice.google.com',
+  'adnxs.com', 'taboola.com', 'outbrain.com', 'criteo.com', 'pubmatic.com', 'openx.net',
+  'rubiconproject.com', 'casalemedia.com', 'adsrvr.org', 'scorecardresearch.com',
+  'quantserve.com', 'media.net', 'advertising.com', 'adform.net', 'smartadserver.com',
+  'yieldmo.com', 'bidswitch.net', 'lijit.com', 'sharethrough.com', 'smaato.net',
+  'serving-sys.com', 'adcolony.com', 'adroll.com', '33across.com', 'undertone.com'
+];
 
 function updateBlockedCount() {
-  if (win && !win.isDestroyed()) win.webContents.send('adblock:count', blockedCount);
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('adblock:count', blockedCount);
+  }
 }
 
 function extensionRegistryPath() { return path.join(app.getPath('userData'), 'extensions.json'); }
@@ -48,11 +58,10 @@ async function installBlocker(ses) {
   } catch (error) {
     console.error('Não foi possível carregar as listas de bloqueio:', error);
     // Fallback reduzido para o navegador ainda bloquear domínios de anúncio comuns offline.
-    const fallback = new Set(['doubleclick.net','googlesyndication.com','googleadservices.com','adnxs.com','taboola.com','outbrain.com','criteo.com']);
     ses.webRequest.onBeforeRequest((details, callback) => {
       let hostname = '';
       try { hostname = new URL(details.url).hostname.toLowerCase(); } catch {}
-      const blocked = adblockEnabled && [...fallback].some(host => hostname === host || hostname.endsWith(`.${host}`));
+      const blocked = adblockEnabled && fallbackAdDomains.some(host => hostname === host || hostname.endsWith(`.${host}`));
       if (blocked) { blockedCount++; updateBlockedCount(); }
       callback({ cancel: blocked });
     });
@@ -90,20 +99,23 @@ function readBookmarkTree(bookmarkFile) {
   });
 }
 
+function wireBrowserWindow(browserWindow) {
+  browserWindow.webContents.on('did-attach-webview', (event, contents) => {
+    const ownerContents = event.sender;
+    contents.setWindowOpenHandler(({ url }) => {
+      if (typeof url === 'string' && /^https?:\/\//i.test(url)) ownerContents.send('browser:new-tab', url);
+      return { action: 'deny' };
+    });
+  });
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 920, minWidth: 900, minHeight: 620,
     backgroundColor: '#101311', title: 'Brisa Browser', frame: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true }
   });
-  win.webContents.on('did-attach-webview', (_event, contents) => {
-    contents.setWindowOpenHandler(({ url }) => {
-      if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
-        win?.webContents.send('browser:new-tab', url);
-      }
-      return { action: 'deny' };
-    });
-  });
+  wireBrowserWindow(win);
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
@@ -115,8 +127,9 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 
-ipcMain.handle('browser:install-extension', async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+ipcMain.handle('browser:install-extension', async (event) => {
+  const owner = BrowserWindow.fromWebContents(event.sender) || win;
+  const { canceled, filePaths } = await dialog.showOpenDialog(owner, {
     title: 'Selecione a pasta da extensão', properties: ['openDirectory']
   });
   if (canceled || !filePaths[0]) return { ok: false, canceled: true };
@@ -159,7 +172,23 @@ ipcMain.handle('browser:adblock-toggle', (_event, enabled) => {
 });
 ipcMain.handle('browser:adblock-count', () => blockedCount);
 ipcMain.handle('browser:open-external', (_event, url) => shell.openExternal(url));
-ipcMain.on('window:minimize', () => win?.minimize());
-ipcMain.on('window:toggle-maximize', () => win?.isMaximized() ? win.unmaximize() : win?.maximize());
-ipcMain.on('window:close', () => win?.close());
+ipcMain.handle('browser:open-window-tabs', (_event, urls) => {
+  const safeUrls = Array.isArray(urls) ? urls.filter(url => typeof url === 'string' && /^https?:\/\//i.test(url)) : [];
+  if (!safeUrls.length) return false;
+  const child = new BrowserWindow({
+    width: 1200, height: 800, minWidth: 900, minHeight: 620,
+    backgroundColor: '#101311', title: 'Brisa Browser', frame: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true }
+  });
+  wireBrowserWindow(child);
+  child.loadFile(path.join(__dirname, 'index.html'));
+  child.webContents.once('did-finish-load', () => child.webContents.send('browser:open-tabs', safeUrls));
+  return true;
+});
+ipcMain.on('window:minimize', event => BrowserWindow.fromWebContents(event.sender)?.minimize());
+ipcMain.on('window:toggle-maximize', event => {
+  const owner = BrowserWindow.fromWebContents(event.sender);
+  if (owner?.isMaximized()) owner.unmaximize(); else owner?.maximize();
+});
+ipcMain.on('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close());
 

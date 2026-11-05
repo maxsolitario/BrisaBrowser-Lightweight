@@ -52,6 +52,15 @@ function save() {
   catch { notify('A imagem ficou grande demais. Escolha uma imagem menor.'); }
 }
 
+async function setAdblockEnabled(enabled, { showNotice = false } = {}) {
+  state.adblock = !!enabled;
+  state.adblock = await window.brisa.setAdblock(state.adblock);
+  $('adblock').classList.toggle('active', state.adblock);
+  $('adToggle')?.classList.toggle('on', state.adblock);
+  save();
+  if (showNotice) notify(state.adblock ? 'Bloqueio ativado' : 'Bloqueio pausado');
+}
+
 function normalizeAddress(value) {
   const text = value.trim();
   if (!text) return '';
@@ -212,7 +221,47 @@ function createBookmarkLink(item, compact = false) {
   label.textContent = item.name;
   link.append(icon, label);
   link.addEventListener('click', () => newTab(item.url));
+  link.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    showBookmarkMenu(event.clientX, event.clientY, [
+      ['Abrir em nova aba', () => newTab(item.url)],
+      ['Abrir em nova janela', () => window.brisa.openWindowTabs([item.url])],
+      ['Renomear', () => renameBookmark(item)],
+      ['Deletar', () => deleteBookmark(item)]
+    ]);
+  });
   return link;
+}
+
+function bookmarkUrls(item) {
+  if (item.type === 'url') return [item.url];
+  return (item.children || []).flatMap(bookmarkUrls);
+}
+
+function showBookmarkMenu(x, y, actions) {
+  const menu = $('bookmarkContextMenu');
+  menu.replaceChildren();
+  actions.forEach(([label, action]) => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.role = 'menuitem'; button.textContent = label;
+    button.onclick = () => { menu.classList.add('hidden'); action(); };
+    menu.append(button);
+  });
+  menu.classList.remove('hidden');
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(x, innerWidth - bounds.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, innerHeight - bounds.height - 8))}px`;
+}
+
+function renameBookmark(item) {
+  const name = prompt(item.type === 'folder' ? 'Nome da pasta:' : 'Nome do favorito:', item.name);
+  if (!name?.trim()) return;
+  item.name = name.trim(); save(); renderBookmarks();
+}
+
+function deleteBookmark(item) {
+  if (!confirm(`Deletar ${item.type === 'folder' ? 'a pasta e seus favoritos' : 'este favorito'}?`)) return;
+  removeBookmarkNode(state.bookmarksBar, item); save(); renderBookmarks();
 }
 
 function renderBookmarkNodes(nodes, host, nested = false) {
@@ -240,10 +289,15 @@ function renderBookmarkNodes(nodes, host, nested = false) {
     menu.append(addSite, addFolder);
     summary.addEventListener('contextmenu', event => {
       event.preventDefault();
-      const action = prompt(`Pasta: ${item.name}\nDigite 1 para renomear ou 2 para excluir:`, '1');
-      if (action === '1') { const name = prompt('Novo nome:', item.name); if (name?.trim()) item.name = name.trim(); }
-      else if (action === '2' && confirm('Excluir esta pasta e seus favoritos?')) removeBookmarkNode(state.bookmarksBar, item);
-      save(); renderBookmarks();
+      const urls = bookmarkUrls(item);
+      const openInTabs = () => urls.forEach(url => newTab(url));
+      const tabLabel = `${urls.length} ${urls.length === 1 ? 'aba' : 'abas'}`;
+      showBookmarkMenu(event.clientX, event.clientY, [
+        [`Abrir ${tabLabel}`, openInTabs],
+        [`Abrir ${tabLabel} em nova janela`, () => window.brisa.openWindowTabs(urls)],
+        ['Renomear pasta', () => renameBookmark(item)],
+        ['Deletar pasta', () => deleteBookmark(item)]
+      ]);
     });
     folder.append(summary, menu);
     host.append(folder);
@@ -333,7 +387,7 @@ async function openSettings(section = 'appearance') {
   const nav = Object.entries(settingsSections).map(([id, name]) => `<button class="settings-nav ${id === section ? 'selected' : ''}" data-settings="${id}">${name}</button>`).join('');
   let content = '';
   if (section === 'appearance') content = `<section class="settings-section"><h3>Aparência</h3><div class="theme-grid">${renderThemes()}</div></section><section class="settings-section"><h3>Papel de parede</h3><div class="wallpaper-grid">${renderWallpapers()}</div><label class="panel-action file-action">Escolher imagem do computador<input id="wallFile" type="file" accept="image/*" hidden></label>${state.customWallpaper ? '<button class="panel-action" id="removeWallpaper">Remover imagem atual</button>' : ''}</section>`;
-  if (section === 'privacy') content = `<h3>Protecao na navegacao</h3><div class="settings-row"><div><strong>Bloquear anuncios e rastreadores</strong><small>Usa listas de filtros atualizadas.</small></div><button id="adToggle" class="toggle ${state.adblock ? 'on' : ''}" aria-label="Alternar bloqueio"></button></div><div class="settings-row"><div><strong>Pedidos bloqueados nesta sessao</strong></div><b>${$('blockedCount').textContent}</b></div><p>Alguns anuncios incluidos diretamente no conteudo do site ainda podem aparecer.</p>`;
+  if (section === 'privacy') content = `<h3>Protecao na navegacao</h3><div class="settings-row"><div><strong>Bloquear anuncios e rastreadores</strong><small>Usa listas de filtros; se não puder carregá-las, aplica uma lista local reduzida.</small></div><button id="adToggle" class="toggle ${state.adblock ? 'on' : ''}" aria-label="Alternar bloqueio"></button></div><div class="settings-row"><div><strong>Pedidos bloqueados nesta sessao</strong></div><b id="settingsBlocked">${$('blockedCount').textContent}</b></div><p>Alguns anuncios incluídos diretamente no conteúdo do site ainda podem aparecer. O bloqueio não interfere nos domínios de vídeo.</p>`;
   if (section === 'extensions') {
     const rows = extensions.length ? extensions.map(item => `<article class="ext-row"><span class="ext-icon">◇</span><div class="ext-info"><strong>${escapeHtml(item.name)}</strong><small>Versao ${escapeHtml(item.version)}</small></div><button data-remove="${escapeHtml(item.id)}">Remover</button></article>`).join('') : '<div class="empty-state"><strong>Nenhuma extensao instalada</strong><p>Escolha a pasta descompactada de uma extensao compativel do Chromium.</p></div>';
     content = `<h3>Extensoes instaladas <span class="count-badge">${extensions.length}</span></h3><p>Gerencie os complementos deste navegador.</p>${rows}<button class="panel-action primary-action" id="installExt">+ Instalar extensao do computador</button><div class="info-note"><strong>Como instalar</strong><p>Descompacte a extensao e selecione a pasta que contem manifest.json. Alguns recursos do Chrome podem nao funcionar no Brisa.</p></div>`;
@@ -350,7 +404,7 @@ async function openSettings(section = 'appearance') {
     $('wallFile').onchange = async event => { const file = event.target.files[0]; if (!file) return; try { const bitmap = await createImageBitmap(file); const scale = Math.min(1, 1920 / bitmap.width, 1200 / bitmap.height); const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); state.customWallpaper = canvas.toDataURL('image/jpeg', 0.78); bitmap.close(); applyWallpaper(); save(); openSettings('appearance'); } catch { notify('Não consegui abrir essa imagem.'); } };
     $('removeWallpaper')?.addEventListener('click', () => { state.customWallpaper = ''; state.wallpaper = 'default'; applyWallpaper(); save(); openSettings('appearance'); });
   }
-  if (section === 'privacy') $('adToggle').onclick = async event => { state.adblock = !state.adblock; event.currentTarget.classList.toggle('on', state.adblock); $('adblock').classList.toggle('active', state.adblock); await window.brisa.setAdblock(state.adblock); save(); };
+  if (section === 'privacy') $('adToggle').onclick = () => setAdblockEnabled(!state.adblock, { showNotice: true });
   if (section === 'extensions') {
     $('installExt').onclick = async () => { const result = await window.brisa.installExtension(); if (result.ok) { notify(`${result.name} instalada`); openSettings('extensions'); } else if (!result.canceled) notify(`Falha: ${result.error}`); };
     $('panelContent').querySelectorAll('[data-remove]').forEach(button => button.onclick = async () => { await window.brisa.removeExtension(button.dataset.remove); openSettings('extensions'); });
@@ -436,11 +490,7 @@ function openCustomize() {
     openCustomize();
   });
   $('adToggle').onclick = async event => {
-    state.adblock = !state.adblock;
-    event.currentTarget.classList.toggle('on', state.adblock);
-    await window.brisa.setAdblock(state.adblock);
-    save();
-    notify(state.adblock ? 'Bloqueio ativado' : 'Bloqueio pausado');
+    await setAdblockEnabled(!state.adblock, { showNotice: true });
   };
   $('manageExt').onclick = openExtensions;
 }
@@ -460,6 +510,8 @@ $('bookmarkFolder').onclick = () => {
   save(); renderBookmarks(); $('bookmarkMenu').classList.add('hidden');
 };
 document.addEventListener('click', event => { if (!event.target.closest('#bookmarkMenu') && !event.target.closest('#bookmarkAdd')) $('bookmarkMenu').classList.add('hidden'); });
+document.addEventListener('click', event => { if (!event.target.closest('#bookmarkContextMenu')) $('bookmarkContextMenu').classList.add('hidden'); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') $('bookmarkContextMenu').classList.add('hidden'); });
 $('back').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.goBack();
 $('forward').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.goForward();
 $('reload').onclick = () => tabs.find(tab => tab.id === activeId)?.page?.reload();
@@ -470,11 +522,7 @@ $('searchForm').onsubmit = event => {
   navigate(tabs.find(tab => tab.id === activeId), $('homeSearch').value);
 };
 $('adblock').onclick = async () => {
-  state.adblock = !state.adblock;
-  $('adblock').classList.toggle('active', state.adblock);
-  await window.brisa.setAdblock(state.adblock);
-  save();
-  notify(state.adblock ? 'Bloqueio ativado' : 'Bloqueio pausado');
+  await setAdblockEnabled(!state.adblock, { showNotice: true });
 };
 $('extensions').onclick = openExtensions;
 $('customize').onclick = () => openSettings('appearance');
@@ -499,8 +547,9 @@ document.addEventListener('keydown', event => {
 });
 window.brisa.onBlockedCount(count => { $('blockedCount').textContent = count; const settingsCount = $('settingsBlocked'); if (settingsCount) settingsCount.textContent = count; });
 window.brisa.onNewTab(url => { if (url) newTab(url); });
+window.brisa.onOpenTabs(urls => { if (Array.isArray(urls)) urls.forEach(url => newTab(url)); });
 window.brisa.adblockCount().then(count => $('blockedCount').textContent = count);
-if (!state.adblock) { $('adblock').classList.remove('active'); window.brisa.setAdblock(false); }
+if (!state.adblock) setAdblockEnabled(false);
 applyTheme();
 applyWallpaper();
 renderGroups();
