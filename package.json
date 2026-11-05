@@ -1,6 +1,6 @@
 {
   "name": "brisa-browser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Um navegador leve, personalizável e com bloqueio de anúncios.",
   "main": "src/main.cjs",
   "author": "Brisa Browser contributors",
@@ -19,10 +19,28 @@
     "appId": "dev.brisa.browser",
     "productName": "Brisa Browser",
     "asar": true,
-    "directories": { "output": "release" },
-    "files": ["src/**/*", "package.json"],
-    "win": { "target": ["nsis", "portable"], "artifactName": "Brisa-${version}-${arch}.${ext}" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true },
-    "portable": { "artifactName": "Brisa-${version}-portable-${arch}.${ext}" }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "Brisa-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "Brisa-${version}-portable-${arch}.${ext}"
+    }
   }
 }

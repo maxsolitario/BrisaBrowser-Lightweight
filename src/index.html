@@ -1,27 +1,72 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https: data: blob:;">
-  <title>Brisa Browser</title><link rel="stylesheet" href="styles.css">
+  <title>Brisa Browser</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-theme="obsidian">
   <header class="chrome">
-    <div class="tabline"><div class="brand"><span class="brand-mark">b</span><span>brisa</span></div><div id="tabs" class="tabs"></div><button id="newTab" class="new-tab" title="Nova aba">＋</button><div class="window-actions"><button id="minimize" title="Minimizar">−</button><button id="maximize" title="Maximizar">□</button><button id="close" title="Fechar">×</button></div></div>
-    <div class="toolbar"><div class="nav-buttons"><button id="back" title="Voltar">‹</button><button id="forward" title="Avançar">›</button><button id="reload" title="Recarregar">↻</button></div><div class="address-wrap"><span class="secure">◈</span><input id="address" spellcheck="false" placeholder="Pesquise ou digite um endereço"><button id="go">↵</button></div><button id="adblock" class="tool-pill active" title="Bloqueio de anúncios">✳ <span id="blockedCount">0</span></button><button id="extensions" class="icon-button" title="Extensões">◇</button><button id="customize" class="icon-button" title="Personalizar">☷</button></div>
+    <div class="tabline">
+      <div class="brand"><span class="brand-mark">b</span><span>brisa</span></div>
+      <div id="tabs" class="tabs"></div>
+      <button id="newTab" class="new-tab" title="Nova aba" aria-label="Nova aba">＋</button>
+      <div class="window-actions">
+        <button id="minimize" title="Minimizar" aria-label="Minimizar">−</button>
+        <button id="maximize" title="Maximizar" aria-label="Maximizar">□</button>
+        <button id="close" title="Fechar" aria-label="Fechar">×</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="nav-buttons">
+        <button id="back" title="Voltar" aria-label="Voltar">‹</button>
+        <button id="forward" title="Avançar" aria-label="Avançar">›</button>
+        <button id="reload" title="Recarregar" aria-label="Recarregar">↻</button>
+      </div>
+      <div class="address-wrap">
+        <span class="secure" aria-hidden="true">◈</span>
+        <input id="address" spellcheck="false" placeholder="Pesquise ou digite um endereço" aria-label="Endereço ou pesquisa">
+        <button id="go" title="Ir" aria-label="Ir">↵</button>
+      </div>
+      <button id="adblock" class="tool-pill active" title="Bloqueio de anúncios">✳ <span id="blockedCount">0</span></button>
+      <button id="extensions" class="icon-button" title="Extensões" aria-label="Extensões">◇</button>
+      <button id="customize" class="icon-button" title="Personalizar" aria-label="Personalizar">☷</button>
+    </div>
   </header>
+
   <main id="stage" class="stage">
     <section id="home" class="home">
-      <div class="home-top"><div class="weather"><span class="sun">☼</span><div><strong>Seu espaço, seu ritmo.</strong><small>Uma nova página para começar com calma.</small></div></div><button id="addSite" class="add-site">＋ <span>Adicionar atalho</span></button></div>
-      <div class="hero"><div class="eyebrow"><span></span> SEU DIA, SEM RUÍDO</div><h1>Respire.<br><em>Explore.</em></h1><p>O que você quer encontrar hoje?</p><form id="searchForm" class="search"><span>⌕</span><input id="homeSearch" placeholder="Pesquise na web ou digite um endereço" autocomplete="off"><kbd>↵</kbd></form>
-        <div class="shortcut-area"><div class="section-heading"><span>SEUS LUGARES</span><button id="addGroup">＋ Novo grupo</button></div><div id="groups" class="groups"></div></div>
+      <div class="wallpaper-shade"></div>
+      <div class="home-top">
+        <div class="home-brand"><span class="home-mark">b</span><span>Seu espaço, sem distrações.</span></div>
+        <button id="addSite" class="add-site">＋ <span>Adicionar site</span></button>
       </div>
-      <div class="home-bottom"><span>Feito para manter o foco.</span><button id="wallpaper">▧ <span>Trocar visual</span></button></div>
+      <div class="home-center">
+        <div id="groups" class="groups"></div>
+        <form id="searchForm" class="search">
+          <span class="search-mark" aria-hidden="true">⌕</span>
+          <input id="homeSearch" placeholder="Pesquise na web ou digite um endereço" autocomplete="off" aria-label="Pesquisar na web">
+          <kbd>↵</kbd>
+        </form>
+        <div class="home-caption">Sua web, do seu jeito.</div>
+      </div>
+      <div class="home-bottom">
+        <span id="themeLabel">Tema Obsidiana</span>
+        <button id="wallpaper">▧ <span>Personalizar</span></button>
+      </div>
     </section>
     <div id="webviews" class="webviews"></div>
-    <aside id="sidePanel" class="side-panel hidden"><div class="panel-head"><div><small>BRISA / AJUSTES</small><h2 id="panelTitle">Personalizar</h2></div><button id="panelClose">×</button></div><div id="panelContent"></div></aside>
+    <aside id="sidePanel" class="side-panel hidden">
+      <div class="panel-head">
+        <div><small>BRISA / AJUSTES</small><h2 id="panelTitle">Personalizar</h2></div>
+        <button id="panelClose" aria-label="Fechar painel">×</button>
+      </div>
+      <div id="panelContent"></div>
+    </aside>
   </main>
-  <div id="toast" class="toast"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="renderer.js"></script>
 </body>
 </html>

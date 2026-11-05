@@ -1,6 +1,6 @@
 # Brisa Browser
 
-Navegador desktop experimental para Windows, com Chromium via Electron, nova aba personalizável, grupos de atalhos, bloqueio básico de anúncios e carregamento de extensões locais compatíveis. O design usa uma identidade escura e tranquila, com verde-lima, tipografia do sistema e poucos controles visuais.
+Navegador desktop experimental para Windows, com Chromium via Electron, nova aba personalizável, grupos de atalhos, bloqueio básico de anúncios e carregamento de extensões locais compatíveis. A nova aba organiza atalhos e pesquisa em um painel compacto, com temas claros e escuros e wallpapers ajustados para cobrir a tela.
 
 ## Requisitos
 
